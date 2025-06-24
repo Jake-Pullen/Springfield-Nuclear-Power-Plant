@@ -1,0 +1,19 @@
+{
+  "name": "Python Container",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "settings": {
+    "python.pythonPath": "/usr/local/bin/python",
+    "terminal.integrated.shell.linux": "/bin/bash"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {}
+  },
+  "postCreateCommand": "pip install -r requirements.txt",
+  "extensions": [
+    "ms-python.python",
+    "ms-python.vscode-pylance"
+  ]
+}

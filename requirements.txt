@@ -1,0 +1,5 @@
+# Core data processing
+pandas>=1.5.0
+
+# Jupyter Notebook support
+jupyter>=1.0.0
