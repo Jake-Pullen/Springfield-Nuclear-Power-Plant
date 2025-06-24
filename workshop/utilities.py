@@ -49,19 +49,27 @@ class WorkshopUtilities:
                             resources_data: List[Dict[str, Any]],
                             progress_callback: Optional[Callable] = None) -> ProgressTracker:
         """Bulk create resources with progress tracking"""
+        # First, create all unique resource groups
+        resource_groups = set(r['resource_group'] for r in resources_data)
+        for rg_name in resource_groups:
+            try:
+                if not client.resource_groups.check_existence(rg_name):
+                    client.resource_groups.create_or_update(
+                        rg_name,
+                        {"location": "uksouth", "tags": {"created_by": "bulk_migration"}}
+                    )
+            except Exception as e:
+                print(f"Warning: Could not create resource group {rg_name}: {e}")
+        # Now create resources
         tracker = ProgressTracker(len(resources_data), progress_callback)
-        
         for i, resource_data in enumerate(resources_data):
             try:
-                # Parse resource type
-                resource_type_parts = resource_data['resource_type'].split('/')
-                if len(resource_type_parts) == 2:
-                    provider_namespace = resource_type_parts[0]
-                    resource_type = resource_type_parts[1]
+                # Parse resource type safely
+                if '/' in resource_data['resource_type']:
+                    provider_namespace, resource_type = resource_data['resource_type'].split('/', 1)
                 else:
                     provider_namespace = 'Microsoft.Resources'
                     resource_type = resource_data['resource_type']
-                
                 # Create resource
                 client.resources.create_or_update(
                     resource_group_name=resource_data['resource_group'],
@@ -76,14 +84,11 @@ class WorkshopUtilities:
                     }
                 )
                 tracker.update(True)
-                
             except Exception as e:
                 tracker.update(False, str(e))
-            
             # Batch delay every 50 resources
             if (i + 1) % 50 == 0:
                 time.sleep(0.5)
-        
         return tracker
     
     @staticmethod
@@ -105,33 +110,29 @@ class WorkshopUtilities:
         """Transfer ownership of all resources"""
         # Find resources to transfer
         resources_to_transfer = WorkshopUtilities.find_resources_by_owner(client, from_owner)
-        
         tracker = ProgressTracker(len(resources_to_transfer), progress_callback)
         transferred_resources = []
-        
         for resource in resources_to_transfer:
             try:
-                # Update tags
-                new_tags = (resource.tags or {}).copy()
-                new_tags['owner'] = to_owner
-                new_tags['previous_owner'] = from_owner
-                new_tags['ownership_transferred'] = datetime.now(timezone.utc).isoformat()
-                
+                # Update tags directly on the resource object
+                if not resource.tags:
+                    resource.tags = {}
+                resource.tags['owner'] = to_owner
+                resource.tags['previous_owner'] = from_owner
+                resource.tags['ownership_transferred'] = datetime.now(timezone.utc).isoformat()
+                # Use the tags operation to persist the change
                 client.tags.create_or_update_at_scope(
                     scope=resource.id,
                     parameters={
                         'properties': {
-                            'tags': new_tags
+                            'tags': resource.tags
                         }
                     }
                 )
-                
                 transferred_resources.append(resource)
                 tracker.update(True)
-                
             except Exception as e:
                 tracker.update(False, str(e))
-        
         return {
             'total_resources': len(resources_to_transfer),
             'successfully_transferred': tracker.completed,

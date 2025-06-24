@@ -1,3 +1,3 @@
-from ._credentials import DefaultAzureCredential, AccessToken
+from ._credentials import DefaultAzureCredential
 
-__all__ = ['DefaultAzureCredential', 'AccessToken']
+__all__ = ['DefaultAzureCredential']

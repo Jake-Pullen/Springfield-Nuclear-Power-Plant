@@ -19,20 +19,21 @@ class ItemPaged(Generic[T], Iterator[T]):
     def __next__(self) -> T:
         if self.current_index >= len(self.items):
             raise StopIteration
-        
+        # Simulate realistic paging delays
+        if self.current_index % self.page_size == 0 and self.current_index > 0:
+            time.sleep(0.1)  # Small delay between pages
         item = self.items[self.current_index]
         self.current_index += 1
-        
-        # Simulate slight network delay
-        time.sleep(0.001)
-        
         return item
     
-    def by_page(self, continuation_token: Optional[str] = None):
-        """Get results by page"""
+    def by_page(self, continuation_token=None):
+        """Return pages of items"""
         start_index = 0
         if continuation_token:
             start_index = int(continuation_token)
-            
-        for i in range(start_index, len(self.items), self.page_size):
-            yield self.items[i:i + self.page_size]
+        while start_index < len(self.items):
+            end_index = min(start_index + self.page_size, len(self.items))
+            page_items = self.items[start_index:end_index]
+            next_token = str(end_index) if end_index < len(self.items) else None
+            yield page_items, next_token
+            start_index = end_index
